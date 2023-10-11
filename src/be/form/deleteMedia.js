@@ -23,7 +23,7 @@ exports.deleteMedia = function(auth, param, userData, res, language, json) {
     }
   }
 
-  mediaHandler.deleteFiles(param, selectedIdentifiers, userData, language,
+  mediaHandler.deleteFiles(param, selectedIdentifiers, userData, language, false,
       function deletedFiles(error) {
 
         if (error) {
