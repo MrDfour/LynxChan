@@ -161,7 +161,7 @@ exports.removeCleanedPosts = function(postsToDelete, boardUri, threadId,
 };
 
 exports.cleanThreadPosts = function(boardUri, threadId, postId, language,
-    callback) {
+    limitToUse, callback) {
 
   posts.aggregate([ {
     $match : {
@@ -173,7 +173,7 @@ exports.cleanThreadPosts = function(boardUri, threadId, postId, language,
       creation : -1
     }
   }, {
-    $skip : bumpLimit
+    $skip : limitToUse
   }, {
     $group : {
       _id : 0,
@@ -218,7 +218,7 @@ exports.cleanThreadPosts = function(boardUri, threadId, postId, language,
 };
 
 exports.updateBoardForPostCreation = function(ip, parameters, postId, thread,
-    cleanPosts, bump, language, enabledCaptcha, callback) {
+    cleanPosts, limitToUse, bump, language, enabledCaptcha, callback) {
 
   if (enabledCaptcha) {
     process.send({
@@ -269,7 +269,7 @@ exports.updateBoardForPostCreation = function(ip, parameters, postId, thread,
 
     if (cleanPosts) {
       exports.cleanThreadPosts(parameters.boardUri, parameters.threadId,
-          postId, language, callback);
+          postId, language, limitToUse, callback);
     } else {
       callback(null, postId);
     }
@@ -279,7 +279,7 @@ exports.updateBoardForPostCreation = function(ip, parameters, postId, thread,
 };
 
 exports.addPostToGlobalLatest = function(omitted, post, thread, parameters,
-    cleanPosts, bump, language, enabledCaptcha, callback) {
+    cleanPosts, limitToUse, bump, language, enabledCaptcha, callback) {
 
   if (!omitted && (overboard || sfwOverboard)) {
     overboardOps.reaggregate({
@@ -293,7 +293,8 @@ exports.addPostToGlobalLatest = function(omitted, post, thread, parameters,
 
   if (omitted || !globalLatestPosts || !post.message) {
     exports.updateBoardForPostCreation(post.ip, parameters, post.postId,
-        thread, cleanPosts, bump, language, enabledCaptcha, callback);
+        thread, cleanPosts, limitToUse, bump, language, enabledCaptcha,
+        callback);
 
   } else {
 
@@ -303,7 +304,8 @@ exports.addPostToGlobalLatest = function(omitted, post, thread, parameters,
       }
 
       exports.updateBoardForPostCreation(post.ip, parameters, post.postId,
-          thread, cleanPosts, bump, language, enabledCaptcha, callback);
+          thread, cleanPosts, limitToUse, bump, language, enabledCaptcha,
+          callback);
 
     });
   }
@@ -429,19 +431,21 @@ exports.updateThread = function(boardData, parameters, thread, language,
 
       if (bump) {
 
-        common.setThreadsPage(parameters.boardUri, function setPages(error) {
-          if (error) {
-            console.log(error);
-          }
+        common.setThreadsPage(parameters.boardUri,
+            function setPages(error) {
+              if (error) {
+                console.log(error);
+              }
 
-          exports.addPostToGlobalLatest(omitted, post, thread, parameters,
-              cleanPosts, bump, language, enabledCaptcha, callback);
+              exports.addPostToGlobalLatest(omitted, post, thread, parameters,
+                  cleanPosts, limitToUse, bump, language, enabledCaptcha,
+                  callback);
 
-        });
+            });
 
       } else {
         exports.addPostToGlobalLatest(omitted, post, thread, parameters,
-            cleanPosts, bump, language, enabledCaptcha, callback);
+            cleanPosts, limitToUse, bump, language, enabledCaptcha, callback);
       }
 
     }
