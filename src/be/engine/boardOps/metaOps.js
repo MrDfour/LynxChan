@@ -608,7 +608,9 @@ exports.manageVolunteer = function(currentVolunteers, parameters, language,
 
     users.findOneAndUpdate({
       login : parameters.login
-    }, userOperation, function gotUser(error, result) {
+    }, userOperation, {
+      includeResultMetadata : true
+    }, function gotUser(error, result) {
       if (error) {
         callback(error);
       } else if (!result.value && !isAVolunteer) {
@@ -987,6 +989,8 @@ exports.setSpecialSettings = function(userData, parameters, language, cb) {
     $set : {
       specialSettings : parameters.specialSettings
     }
+  }, {
+    includeResultMetadata : true
   }, function gotBoard(error, result) {
 
     if (error) {

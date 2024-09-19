@@ -271,6 +271,8 @@ exports.recordEdit = function(parameters, login, language, callback) {
       subject : parameters.subject
     },
     $unset : miscOps.individualCaches
+  }, {
+    includeResultMetadata : true
   }, function savedEdit(error, posting) {
     if (error) {
       callback(error);

@@ -197,6 +197,8 @@ exports.deleteThumb = function(userData, params, language, callback) {
         // style exception, too simple
         thumbs.findOneAndDelete({
           _id : parsedId
+        }, {
+          includeResultMetadata : true
         }, function(error, removed) {
           if (error) {
             callback(error);

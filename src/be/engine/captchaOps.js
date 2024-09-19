@@ -592,6 +592,8 @@ exports.attemptCaptcha = function(id, input, board, language, cb, thread) {
     expiration : {
       $gt : new Date()
     }
+  }, {
+    includeResultMetadata : true
   }, function gotCaptcha(error, captcha) {
 
     if (error || captcha.value) {
@@ -628,6 +630,8 @@ exports.solveCaptcha = function(parameters, language, callback) {
     $set : {
       expiration : new Date(new Date().getTime() + 1000 * 60 * 60)
     }
+  }, {
+    includeResultMetadata : true
   }, function gotCaptcha(error, captcha) {
 
     if (error || captcha.value) {

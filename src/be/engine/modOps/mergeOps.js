@@ -141,6 +141,8 @@ exports.cleanOldThread = function(parameters, userData, callback) {
   threads.findOneAndDelete({
     boardUri : parameters.boardUri,
     threadId : +parameters.threadSource
+  }, {
+    includeResultMetadata : true
   }, function(error, result) {
 
     if (error && verbose) {

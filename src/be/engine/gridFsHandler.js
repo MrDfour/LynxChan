@@ -180,6 +180,10 @@ exports.writeData = function(data, dest, mime, meta, callback, compressed) {
 
   var writeCallback = function(error, newDoc) {
 
+    if (error) {
+      return callback(error);
+    }
+
     exports.removeDuplicates(newDoc, function removedDuplicates(error) {
 
       if (error) {

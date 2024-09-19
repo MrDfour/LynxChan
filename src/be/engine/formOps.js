@@ -4,7 +4,7 @@
 
 var fs = require('fs');
 var url = require('url');
-var formidable = require('formidable');
+var formidable = require('formidable').formidable;
 var logger = require('../logger');
 var db = require('../db');
 var exifCommand = 'exiftool -all= -tagsfromfile @ -Orientation -ColorSpaceTags';

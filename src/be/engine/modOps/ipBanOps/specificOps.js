@@ -653,6 +653,8 @@ exports.appealBan = function(ip, bypass, parameters, language, callback) {
       appealIp : ip,
       appealBypass : bypass
     }
+  }, {
+    includeResultMetadata : true
   }, function gotBan(error, result) {
 
     if (error) {

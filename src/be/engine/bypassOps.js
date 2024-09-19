@@ -319,6 +319,8 @@ exports.useBypass = function(bypassId, req, callback, thread) {
       usesLeft : -1
     },
     $set : setBlock
+  }, {
+    includeResultMetadata : true
   }, function updatedPass(error, result) {
 
     var errorToReturn;

@@ -446,7 +446,8 @@ function deduplicateFilesForPosting(postingData, callback, index) {
     }
   }, {
     upsert : true,
-    returnDocument : 'after'
+    returnDocument : 'after',
+    includeResultMetadata : true
   }, function updatedReference(error, result) {
 
     if (error) {

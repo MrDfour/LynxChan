@@ -528,6 +528,8 @@ exports.validate = function(auth, language, callback) {
       lastSeen : now,
       inactive : false
     }
+  }, {
+    includeResultMetadata : true
   }, function foundUser(error, result) {
     if (error) {
       callback(error);
@@ -707,7 +709,9 @@ exports.recoverAccount = function(parameters, language, callback) {
     expiration : {
       $gte : new Date()
     }
-  }, {}, function gotRequest(error, request) {
+  }, {
+    includeResultMetadata : true
+  }, function gotRequest(error, request) {
     if (error) {
       callback(error);
     } else if (!request.value) {
@@ -1177,7 +1181,9 @@ exports.confirmEmail = function(parameters, language, callback) {
     },
     login : parameters.login,
     confirmationToken : parameters.hash
-  }, {}, function gotConfirmation(error, result) {
+  }, {
+    includeResultMetadata : true
+  }, function gotConfirmation(error, result) {
 
     if (error) {
       callback(error);

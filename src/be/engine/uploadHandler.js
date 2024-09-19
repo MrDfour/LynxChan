@@ -511,7 +511,8 @@ exports.processFile = function(file, callback) {
     }
   }, {
     upsert : true,
-    returnDocument : 'after'
+    returnDocument : 'after',
+    includeResultMetadata : true
   }, function updatedReference(error, result) {
 
     if (error) {
