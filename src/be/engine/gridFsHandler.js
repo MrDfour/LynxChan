@@ -75,6 +75,52 @@ exports.removeDuplicates = function(uploadStream, callback) {
   });
 };
 
+exports.createSubdirectory = function(newDoc, callback) {
+
+  var idString = newDoc._id.toString();
+  var destDir = __dirname + '/../media/';
+  destDir += idString.substring(idString.length - 3);
+  var newPath = destDir + '/' + idString;
+
+  // style exception, too simple
+  fs.mkdir(destDir, function(error) {
+
+    if (error && error.code !== 'EEXIST') {
+
+      return files.deleteOne({
+        _id : newDoc._id
+      }, function() {
+        callback(error);
+      });
+
+    }
+
+    callback(null, newPath);
+
+  });
+};
+
+exports.insertRawFileDocument = function(dest, size, contentType, metadata,
+    callback) {
+
+  var newDoc = {
+    filename : dest,
+    onDisk : true,
+    contentType : contentType,
+    metadata : metadata,
+    length : size
+  };
+
+  files.insertOne(newDoc, function(error) {
+
+    newDoc.id = newDoc._id;
+
+    callback(error, newDoc);
+
+  });
+
+};
+
 // Section 1: Writing data {
 exports.compressData = function(data, dest, mime, meta, callback) {
 
@@ -92,16 +138,36 @@ exports.compressData = function(data, dest, mime, meta, callback) {
 
 };
 
+exports.writeDataToDisk = function(data, newDoc, newPath, callback) {
+
+  fs.writeFile(newPath, data, function(error) {
+
+    if (error) {
+      // style exception, too simple
+      return files.deleteOne({
+        _id : newDoc.id
+      }, function() {
+        callback(error);
+      });
+      // style exception, too simple
+
+    }
+
+    callback(null, newDoc);
+
+  });
+
+};
+
 exports.writeData = function(data, dest, mime, meta, callback, compressed) {
 
-  if (typeof (data) === 'string') {
+  meta.lastModified = new Date();
 
+  if (typeof (data) === 'string') {
     data = Buffer.from(data, 'utf-8');
   }
 
   if (!compressed) {
-
-    meta.lastModified = new Date();
 
     if (miscOps.isPlainText(mime)) {
       meta.compressed = true;
@@ -112,6 +178,51 @@ exports.writeData = function(data, dest, mime, meta, callback, compressed) {
     console.log('Writing data on gridfs under \'' + dest + '\'');
   }
 
+  var writeCallback = function(error, newDoc) {
+
+    exports.removeDuplicates(newDoc, function removedDuplicates(error) {
+
+      if (error) {
+        return callback(error);
+      }
+
+      if (!compressed && meta.compressed) {
+        exports.compressData(data, dest, mime, meta, callback);
+      } else {
+        callback();
+      }
+
+    });
+
+  };
+
+  if (diskMedia) {
+
+    return exports.insertRawFileDocument(dest, data.length, mime, meta,
+        function(error, newDoc) {
+
+          if (error) {
+            return callback(error);
+          } else if (masterNode) {
+            return exports.sendFileToMaster(newDoc, data, writeCallback);
+          }
+
+          // style exception, too simple
+          exports.createSubdirectory(newDoc, function(error, newPath) {
+
+            if (error) {
+              return callback(error);
+            } else {
+              exports.writeDataToDisk(data, newDoc, newPath, writeCallback);
+            }
+
+          });
+          // style exception, too simple
+
+        });
+
+  }
+
   var uploadStream = bucket.openUploadStream(dest, {
     contentType : mime,
     metadata : meta,
@@ -120,26 +231,8 @@ exports.writeData = function(data, dest, mime, meta, callback, compressed) {
 
   uploadStream.once('error', callback);
 
-  uploadStream.once('finish', function finished() {
-
-    // style exception, too simple
-    exports.removeDuplicates(uploadStream, function removedDuplicates(error) {
-
-      if (error) {
-        callback(error);
-      } else {
-
-        if (!compressed && meta.compressed) {
-          exports.compressData(data, dest, mime, meta, callback);
-        } else {
-          callback();
-        }
-
-      }
-
-    });
-    // style exception, too simple
-
+  uploadStream.once('finish', function() {
+    writeCallback(null, uploadStream);
   });
 
   uploadStream.write(data);
@@ -162,15 +255,7 @@ exports.concatFileString = function(boundary, newDoc) {
 
 };
 
-exports.sendFileToMaster = function(newDoc, path, callback, attempts, error) {
-
-  attempts = attempts || 0;
-
-  if (attempts >= 10) {
-    return callback(error);
-  }
-
-  var readStream = fs.createReadStream(path);
+exports.prepareMasterRequest = function(newDoc, path, callback) {
 
   var boundary = '--------------------------';
   for (var i = 0; i < 24; i++) {
@@ -181,15 +266,41 @@ exports.sendFileToMaster = function(newDoc, path, callback, attempts, error) {
 
   buffer = Buffer.from(exports.concatFileString(boundary, newDoc));
 
-  readStream.on('error', function(error) {
-    exports.sendFileToMaster(newDoc, path, callback, ++attempts, error);
+  if ((typeof path) !== 'string') {
+    return callback(null, Buffer.concat([ buffer, path ]), boundary);
+  }
+
+  var readStream = fs.createReadStream(path);
+
+  readStream.once('error', function(error) {
+    callback(error);
   });
 
   readStream.on('data', function(data) {
     buffer = Buffer.concat([ buffer, data ]);
   });
 
-  readStream.on('end', function() {
+  readStream.once('end', function() {
+    callback(null, buffer, boundary);
+  });
+
+};
+
+exports.sendFileToMaster = function(newDoc, path, callback, attempts, error) {
+
+  attempts = attempts || 0;
+
+  if (attempts >= 10) {
+    return callback(error);
+  }
+
+  exports.prepareMasterRequest(newDoc, path, function(error, buffer, boundary) {
+
+    if (error) {
+      return exports
+          .sendFileToMaster(newDoc, path, callback, ++attempts, error);
+    }
+
     buffer = Buffer.concat([ buffer,
         Buffer.from(lBreak + '--' + boundary + '--' + lBreak) ]);
 
@@ -225,16 +336,11 @@ exports.sendFileToMaster = function(newDoc, path, callback, attempts, error) {
 
 };
 
-exports.copyFileToLocation = function(path, newDoc, callback) {
+exports.writeFileToDisk = function(path, newDoc, callback) {
 
-  var idString = newDoc._id.toString();
-  var destDir = __dirname + '/../media/';
-  destDir += idString.substring(idString.length - 3);
-  var newPath = destDir + '/' + idString;
+  exports.createSubdirectory(newDoc, function(error, newPath) {
 
-  fs.mkdir(destDir, function(error) {
-
-    if (error && error.code !== 'EEXIST') {
+    if (error) {
       return callback(error);
     }
 
@@ -248,34 +354,6 @@ exports.copyFileToLocation = function(path, newDoc, callback) {
 
 };
 
-exports.writeFileToDisk = function(dest, path, fileInfo, callback, size) {
-
-  var newDoc = {
-    filename : dest,
-    onDisk : true,
-    contentType : fileInfo.contentType,
-    metadata : fileInfo.metadata,
-    length : size
-  };
-
-  files.insertOne(newDoc, function(error) {
-
-    if (error) {
-      return callback(error);
-    }
-
-    newDoc.id = newDoc._id;
-
-    if (masterNode) {
-      return exports.sendFileToMaster(newDoc, path, callback);
-    }
-
-    exports.copyFileToLocation(path, newDoc, callback);
-
-  });
-
-};
-
 exports.getDiskFileStats = function(dest, path, fileInfo, callback) {
 
   fs.stat(path, function(error, info) {
@@ -284,7 +362,20 @@ exports.getDiskFileStats = function(dest, path, fileInfo, callback) {
       return callback(error);
     }
 
-    exports.writeFileToDisk(dest, path, fileInfo, callback, info.size);
+    // style exception, too simple
+    exports.insertRawFileDocument(dest, info.size, fileInfo.contentType,
+        fileInfo.metadata, function(error, newDoc) {
+
+          if (error) {
+            callback(error);
+          } else if (masterNode) {
+            exports.sendFileToMaster(newDoc, path, callback);
+          } else {
+            exports.writeFileToDisk(path, newDoc, callback);
+          }
+
+        });
+    // style exception, too simple
 
   });
 

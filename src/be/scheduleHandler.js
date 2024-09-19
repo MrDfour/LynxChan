@@ -437,6 +437,8 @@ function checkExpiredCaptchas() {
       }
     }
   }, {
+    $limit : 100000
+  }, {
     $group : {
       _id : 0,
       files : {
