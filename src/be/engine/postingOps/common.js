@@ -288,7 +288,7 @@ exports.doesUserWishesToSign = function(userData, parameters) {
 
   var askedToSign = informedName.toLowerCase().indexOf('#rs') > -1;
 
-  return alwaysSigns || askedToSign;
+  return alwaysSigns || askedToSign || !!parameters.roleSignature;
 
 };
 

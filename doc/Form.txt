@@ -62,6 +62,7 @@ Parameters:
     captcha: captcha input.
     spoiler: if anything is sent, indicates the images should be spoilered.
     flag: id of a flag to be used.
+    roleSignature: equivalent to using #rs as tripcode.
 
 Json output(Number): id of the new thread.
 
@@ -85,6 +86,7 @@ Parameters:
     captcha: captcha input.
     spoiler: if anything is sent, indicates the images should be spoilered.
     flag: id of a flag to be used.
+    roleSignature: equivalent to using #rs as tripcode.
 
 Json output(Number): id of the new reply.
 
