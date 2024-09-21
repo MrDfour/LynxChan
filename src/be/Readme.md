@@ -163,7 +163,8 @@ Settings files that goes into the settings directory:
 * `overboard`: uri of the overboard.
 * `overBoardThreadCount`(Number): amount of threads that should be shown at the overboard. Defaults to 50.
 * `bypassMaxPosts`(Number): how many uses a block bypass will have before expires. Defaults to 30.
-* `bypassDurationHours`(Number): how many hours a block bypass will last. Defaults to 24
+* `bypassEarlyExpirationMinutes`(Number): how many minutes a bypass will last before being used for the first time. If none is set, bypasses will not expire any early if not used.
+* `bypassDurationHours`(Number): how many hours a block bypass will last. Defaults to 24.
 * `bypassMode`(Number): mode used for bypass. 0 means that it won`t be enabled. 1 means that users caught in range bans and TOR users (if TOR is allowed to use block bypass) will be able to post if they get a bypass token. 2 means that anyone will only be able to post if they get a bypass token. Defaults to 0.
 * `multiboardThreadCount`(Number): amount of threads to be displayed on the multi-board. If none is set, multi-board will not be enabled.
 * `rssDomain`: domain used on links on the RSS feeds. Defaults to ''. 

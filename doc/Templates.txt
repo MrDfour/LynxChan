@@ -2067,6 +2067,10 @@ checkboxDisableNewBypasses:
     use: might be turned on.
     description: checkbox that indicates if the creation of new bypasses is disabled.
 
+fieldBypassEarlyExpiration:
+    use: have it's value manipulated.
+    description: field with the value in minutes that will be used for early bypass expiration.
+
 fieldAutoCaptchaLimit:
     use: have it's value manipulated.
     description: field with the thread limit required for automatic captcha activation on a board.

@@ -244,6 +244,11 @@
   },
   {
     "type": "number",
+    "setting": "bypassEarlyExpirationMinutes",
+    "element": "fieldBypassEarlyExpiration"
+  },
+  {
+    "type": "number",
     "setting": "flagLimit",
     "element": "fieldFlagLimit"
   },

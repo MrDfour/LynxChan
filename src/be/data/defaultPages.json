@@ -500,6 +500,7 @@
       "fieldCaptchaPool": "value",
       "checkboxUnlockHistory": "checked",
       "fieldReportCategories": "value",
+      "fieldBypassEarlyExpiration": "value",
       "fieldFlagLimit": "value",
       "fieldDefaultTheme": "value",
       "checkboxDisableEmail": "checked",

@@ -7,6 +7,7 @@ var db = require('../db');
 var lang;
 var bypasses = db.bypasses();
 var expirationToAdd;
+var earlyExpirationToAdd;
 var captchaOps;
 var floodDisabled;
 var floodExpiration;
@@ -29,6 +30,7 @@ exports.loadSettings = function() {
   floodDisabled = settings.disableFloodCheck;
   validationRange = settings.bypassValidationRange;
   expirationToAdd = settings.bypassDurationHours;
+  earlyExpirationToAdd = settings.bypassEarlyExpirationMinutes;
   extraBypassRole = settings.extraBypassMinRole;
 };
 
@@ -47,8 +49,18 @@ exports.createBypassDoc = function(session, validationCode, validationResult,
   var expiration = new Date();
   expiration.setUTCHours(expiration.getUTCHours() + expirationToAdd);
 
+  var earlyExpiration = new Date();
+
+  if (earlyExpirationToAdd) {
+    earlyExpiration.setUTCMinutes(earlyExpiration.getUTCMinutes()
+        + earlyExpirationToAdd);
+  } else {
+    earlyExpiration = expiration;
+  }
+
   var toInsert = {
     session : session,
+    earlyExpiration : earlyExpiration,
     creation : new Date(),
     unused : true,
     validationCode : validationCode,
@@ -300,19 +312,35 @@ exports.useBypass = function(bypassId, req, callback, thread) {
   var toAdd = multiplierToUse * floodExpiration;
   nextUse.setUTCSeconds(nextUse.getUTCSeconds() + toAdd);
 
+  var now = new Date();
+
   bypasses.findOneAndUpdate({
     _id : bypassId,
     session : session,
-    $or : [ {
-      validated : true
+    $and : [ {
+      $or : [ {
+        unused : false
+      }, {
+        earlyExpiration : {
+          $exists : false
+        }
+      }, {
+        earlyExpiration : {
+          $gt : now
+        }
+      } ]
     }, {
-      validationCode : null
+      $or : [ {
+        validated : true
+      }, {
+        validationCode : null
+      } ]
     } ],
     usesLeft : {
       $gt : 0
     },
     expiration : {
-      $gt : new Date()
+      $gt : now
     }
   }, {
     $inc : {
