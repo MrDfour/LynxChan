@@ -2075,6 +2075,14 @@ fieldAutoCaptchaLimit:
     use: have it's value manipulated.
     description: field with the thread limit required for automatic captcha activation on a board.
 
+fieldBypassTorMaxPosts:
+    use: have it's value manipulated.
+    description: field with the value of how many posts a bypass can make for tor users.
+
+fieldBypassTorDurationHours:
+    use: have it's value manipulated.
+    description: field with the value in hours for how long a bypass will last for tor users.
+
 fieldCaptchaPool:
     use: have it's value manipulated.
     description: field with the limit of the captcha pool.

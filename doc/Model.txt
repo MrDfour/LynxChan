@@ -337,7 +337,9 @@ blockBypasses: stores data about bypassing tokens.
     hourlyLimitEnd(Date): time at which the hourly limit started counting.
     hourlyLimitCount(Number): count towards the hourly limit.
     usesLeft(Number): how many uses are left in this token.
+    torUsesLeft(Number): how many uses left specifically for tor in this token.
     expiration(Date): time of when the token will expire.
+    torExpiration(Date): time of when the token will expire specifically for tor.
     earlyExpiration(Date): time of when the token will expire before first usage.
     validationCode(Number): code that validates the bypass POW.
     session(String): authentication string for the bypass.

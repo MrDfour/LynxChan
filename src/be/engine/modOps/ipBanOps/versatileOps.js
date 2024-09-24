@@ -6,6 +6,7 @@ var db = require('../../../db');
 var bans = db.bans();
 var taskListener = require('../../../taskListener');
 var boards = db.boards();
+var bypasses = db.bypasses();
 var torLevel;
 var torAllowed;
 var bypassAllowed;
@@ -411,6 +412,52 @@ exports.checkForFlood = function(req, boardUri, thread, callback) {
 
 };
 
+exports.finishTorBypassCheck = function(req, boardUri, callback) {
+
+  if ((req.bypassed && torAllowed) || torLevel > 1) {
+
+    if (req.bypassId) {
+      exports.getActiveBan(null, null, req.bypassId, boardUri, callback);
+    } else {
+      callback();
+    }
+
+  } else {
+
+    callback(torPassAllowed ? null : lang(req.language).errBlockedTor, null,
+        torPassAllowed);
+  }
+
+};
+
+exports.checkTorBypassLimits = function(req, boardUri, callback) {
+
+  bypasses.findOneAndUpdate({
+    _id : req.bypassId,
+    torUsesLeft : {
+      $gt : 0
+    },
+    torExpiration : {
+      $gt : new Date()
+    }
+  }, {
+    $inc : {
+      torUsesLeft : -1
+    }
+  }, {
+    includeResultMetadata : true
+  }, function(error, result) {
+
+    if (!result.value) {
+      delete req.bypassed;
+    }
+
+    exports.finishTorBypassCheck(req, boardUri, callback);
+
+  });
+
+};
+
 exports.checkForBan = function(req, boardUri, thread, callback) {
 
   if (bypassMandatory && !req.bypassed) {
@@ -424,21 +471,11 @@ exports.checkForBan = function(req, boardUri, thread, callback) {
     }
 
     if (!req.isTor) {
-      return exports.checkForFlood(req, boardUri, thread, callback);
-    }
-
-    if ((req.bypassed && torAllowed) || torLevel > 1) {
-
-      if (req.bypassId) {
-        exports.getActiveBan(null, null, req.bypassId, boardUri, callback);
-      } else {
-        callback();
-      }
-
+      exports.checkForFlood(req, boardUri, thread, callback);
+    } else if (req.bypassed) {
+      exports.checkTorBypassLimits(req, boardUri, callback);
     } else {
-
-      callback(torPassAllowed ? null : lang(req.language).errBlockedTor, null,
-          torPassAllowed);
+      exports.finishTorBypassCheck(req, boardUri, callback);
     }
 
   });

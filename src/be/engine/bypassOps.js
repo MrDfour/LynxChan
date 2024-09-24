@@ -7,11 +7,13 @@ var db = require('../db');
 var lang;
 var bypasses = db.bypasses();
 var expirationToAdd;
+var expirationTorToAdd;
 var earlyExpirationToAdd;
 var captchaOps;
 var floodDisabled;
 var floodExpiration;
 var bypassMaxPosts;
+var bypassTorMaxPosts;
 var bypassMode;
 var hourlyLimit;
 var validationRange;
@@ -26,10 +28,12 @@ exports.loadSettings = function() {
   floodExpiration = settings.floodTimerSec;
   hourlyLimit = 600 / floodExpiration;
   bypassMaxPosts = settings.bypassMaxPosts;
+  bypassTorMaxPosts = settings.bypassTorMaxPosts;
   bypassMode = settings.bypassMode;
   floodDisabled = settings.disableFloodCheck;
   validationRange = settings.bypassValidationRange;
   expirationToAdd = settings.bypassDurationHours;
+  expirationTorToAdd = settings.bypassTorDurationHours;
   earlyExpirationToAdd = settings.bypassEarlyExpirationMinutes;
   extraBypassRole = settings.extraBypassMinRole;
 };
@@ -49,6 +53,10 @@ exports.createBypassDoc = function(session, validationCode, validationResult,
   var expiration = new Date();
   expiration.setUTCHours(expiration.getUTCHours() + expirationToAdd);
 
+  var torExpiration = new Date();
+  torExpiration.setUTCHours(torExpiration.getUTCHours()
+      + (expirationTorToAdd || expirationToAdd));
+
   var earlyExpiration = new Date();
 
   if (earlyExpirationToAdd) {
@@ -66,7 +74,9 @@ exports.createBypassDoc = function(session, validationCode, validationResult,
     validationCode : validationCode,
     validationHash : validationResult,
     usesLeft : bypassMaxPosts,
-    expiration : expiration
+    torUsesLeft : bypassTorMaxPosts || bypassMaxPosts,
+    expiration : expiration,
+    torExpiration : torExpiration
   };
 
   // style exception, too simple
@@ -209,6 +219,17 @@ exports.checkBypass = function(bypassId, callback) {
   bypasses.findOne({
     _id : bypassId,
     session : session,
+    $or : [ {
+      unused : false
+    }, {
+      earlyExpiration : {
+        $exists : false
+      }
+    }, {
+      earlyExpiration : {
+        $gt : new Date()
+      }
+    } ],
     usesLeft : {
       $gt : 0
     },
@@ -366,9 +387,7 @@ exports.useBypass = function(bypassId, req, callback, thread) {
     } else if (!result.value) {
       return callback(null, req);
     } else if (!floodDisabled && result.value[usageField] > now) {
-
       errorToReturn = exports.getMissingTime(result, usageField, now, req);
-
     } else if (!floodDisabled && limitCheck) {
       errorToReturn = lang(req.language).errHourlyLimit;
     } else {

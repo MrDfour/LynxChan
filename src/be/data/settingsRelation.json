@@ -249,6 +249,16 @@
   },
   {
     "type": "number",
+    "setting": "bypassTorMaxPosts",
+    "element": "fieldBypassTorMaxPosts"
+  },
+  {
+    "type": "number",
+    "setting": "bypassTorDurationHours",
+    "element": "fieldBypassTorDurationHours"
+  },
+  {
+    "type": "number",
     "setting": "flagLimit",
     "element": "fieldFlagLimit"
   },
