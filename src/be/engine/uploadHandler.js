@@ -216,11 +216,44 @@ exports.transferThumbToGfs = function(identifier, file, callback) {
 
 exports.generateVideoThumb = function(identifier, file, tooSmall, callback) {
 
-  var command = videoThumbCommand.replace('{$path}', file.pathInDisk);
-
   var extensionToUse = thumbExtension || 'png';
 
   var thumbDestination = file.pathInDisk + '_.' + extensionToUse;
+
+  file.thumbMime = logger.getMime(thumbDestination);
+  file.thumbOnDisk = thumbDestination;
+  file.thumbPath = '/.media/t_' + identifier;
+
+  var thumbCallback = function(error) {
+
+    if (error) {
+      callback(error);
+    } else {
+      exports.transferThumbToGfs(identifier, file, callback);
+    }
+
+  };
+
+  if (native) {
+
+    var widthToUse, heightToUse;
+
+    if (tooSmall) {
+      widthToUse = file.width;
+      heightToUse = file.height;
+    } else if (file.width > file.height) {
+      widthToUse = thumbSize;
+      heightToUse = Math.floor(file.height * (thumbSize / file.width));
+    } else {
+      heightToUse = thumbSize;
+      widthToUse = Math.floor(file.width * (thumbSize / file.height));
+    }
+
+    return native.thumbNailVideo(file.pathInDisk, thumbDestination, widthToUse,
+        heightToUse, thumbCallback);
+  }
+
+  var command = videoThumbCommand.replace('{$path}', file.pathInDisk);
 
   if (tooSmall) {
     command += '-1:-1';
@@ -232,19 +265,9 @@ exports.generateVideoThumb = function(identifier, file, tooSmall, callback) {
 
   command += ' ' + thumbDestination;
 
-  file.thumbMime = logger.getMime(thumbDestination);
-  file.thumbOnDisk = thumbDestination;
-  file.thumbPath = '/.media/t_' + identifier;
-
   exec(command, {
     maxBuffer : Infinity
-  }, function createdThumb(error) {
-    if (error) {
-      callback(error);
-    } else {
-      exports.transferThumbToGfs(identifier, file, callback);
-    }
-  });
+  }, thumbCallback);
 
 };
 
