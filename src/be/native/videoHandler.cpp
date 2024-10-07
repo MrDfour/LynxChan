@@ -13,10 +13,10 @@ public:
       Napi::AsyncWorker(callback), path(path) {
   }
 
-  VideoWorker(Napi::Function& callback, std::string input, std::string output,
-      int width, int height) :
+  VideoWorker(Napi::Function& callback, bool gif, std::string input,
+      std::string output, int width, int height) :
       Napi::AsyncWorker(callback), path(input), output(output), width(width), height(
-          height) {
+          height), gifThumb(gif) {
     thumbNail = true;
   }
 
@@ -29,22 +29,25 @@ public:
     }
 
     av_packet_unref(decodePacket);
+    av_packet_unref(encodePacket);
 
     // flush the codec contexts with null packet
     avcodec_send_frame(encoderContext, nullptr);
     avcodec_send_packet(decoderContext, nullptr);
 
-    av_packet_free(&encodePacket);
-    av_packet_free(&decodePacket);
+    av_freep(&outputFrame->data);
+
     av_frame_free(&outputFrame);
     av_frame_free(&inputFrame);
 
-    av_free(outputFrameBuffer);
-
     sws_freeContext(swsCtx);
+
+    av_packet_free(&encodePacket);
+    av_packet_free(&decodePacket);
 
     avcodec_free_context(&encoderContext);
     avcodec_free_context(&decoderContext);
+
     avformat_free_context(outputFormatContext);
 
   }
@@ -63,8 +66,8 @@ public:
       return false;
     }
 
-    int streamIndex = av_find_best_stream(inputFormatContext,
-        AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    streamIndex = av_find_best_stream(inputFormatContext, AVMEDIA_TYPE_VIDEO,
+        -1, -1, nullptr, 0);
 
     if (streamIndex < 0) {
       error = AVERROR_UNKNOWN;
@@ -83,90 +86,9 @@ public:
 
   }
 
-  void transcodeFrame() {
-
-    if (!sws_scale(swsCtx, inputFrame->data, inputFrame->linesize, 0,
-        inputFrame->height, outputFrame->data, outputFrame->linesize)) {
-      error = AVERROR_UNKNOWN;
-      return;
-    }
-
-    av_frame_unref(inputFrame);
-
-    error = avcodec_send_frame(encoderContext, outputFrame);
-
-    if (error) {
-      return;
-    }
-
-    error = avcodec_receive_packet(encoderContext, encodePacket);
-
-    if (error) {
-      return;
-    }
-
-    FILE* pFile;
-    pFile = fopen(output.c_str(), "wb");
-    fwrite(encodePacket->data, 1, encodePacket->size, pFile);
-    fclose(pFile);
-
-    av_packet_unref(encodePacket);
-
-  }
-
-  bool read_frame_until_time(int64_t time_in_tb) {
-
-    int tempError;
-
-    while (true) {
-
-      av_frame_unref(inputFrame);
-      av_packet_unref(decodePacket);
-
-      error = av_read_frame(inputFormatContext, decodePacket);
-
-      if (error < 0) {
-        return false;
-      }
-
-      if (decodePacket->stream_index != stream->index) {
-        continue;
-      }
-
-      tempError = avcodec_send_packet(decoderContext, decodePacket);
-      if (tempError < 0) {
-        if (tempError == AVERROR(EAGAIN)) {
-          continue;
-        } else {
-          error = tempError;
-          return false;
-        }
-      }
-
-      tempError = avcodec_receive_frame(decoderContext, inputFrame);
-
-      if (tempError < 0) {
-
-        if (tempError == AVERROR(EAGAIN)) {
-          continue;
-        } else {
-          error = tempError;
-          return false;
-        }
-      }
-
-      if (inputFrame->best_effort_timestamp >= time_in_tb) {
-        break;
-      }
-
-    }
-
-    return true;
-  }
-
   void ThumbNail() {
 
-//Opening input
+    //opening decoder
     AVCodec* decoderCodec = avcodec_find_decoder(codecParameters->codec_id);
 
     decoderContext = avcodec_alloc_context3(decoderCodec);
@@ -187,8 +109,39 @@ public:
     if (error) {
       return;
     }
-//Opened input
+    //opening decoder
 
+    //init frames and packets
+
+    inputFrame = av_frame_alloc();
+
+    if (!inputFrame) {
+      error = AVERROR_UNKNOWN;
+      return;
+    }
+
+    outputFrame = av_frame_alloc();
+
+    if (!outputFrame) {
+      error = AVERROR_UNKNOWN;
+      return;
+    }
+
+    decodePacket = av_packet_alloc();
+
+    if (!decodePacket) {
+      error = AVERROR_UNKNOWN;
+      return;
+    }
+
+    encodePacket = av_packet_alloc();
+
+    if (!encodePacket) {
+      error = AVERROR_UNKNOWN;
+      return;
+    }
+
+    //init encoder
     avformat_alloc_output_context2(&outputFormatContext, NULL, NULL,
         output.c_str());
 
@@ -230,6 +183,7 @@ public:
     }
     //init encoder
 
+    //init scaler
     swsCtx = sws_getContext(decoderContext->width, decoderContext->height,
         decoderContext->pix_fmt, encoderContext->width, encoderContext->height,
         encoderContext->pix_fmt, 0, nullptr, nullptr, nullptr);
@@ -238,88 +192,142 @@ public:
       error = AVERROR_UNKNOWN;
       return;
     }
-
-    //init frames
-
-    inputFrame = av_frame_alloc();
-
-    if (!inputFrame) {
-      error = AVERROR_UNKNOWN;
-      return;
-    }
-
-    outputFrame = av_frame_alloc();
-
-    if (!outputFrame) {
-      error = AVERROR_UNKNOWN;
-      return;
-    }
-
-    decodePacket = av_packet_alloc();
-
-    if (!decodePacket) {
-      error = AVERROR_UNKNOWN;
-      return;
-    }
-
-    encodePacket = av_packet_alloc();
-
-    if (!encodePacket) {
-      error = AVERROR_UNKNOWN;
-      return;
-    }
+    //init scaler
 
     outputFrame->format = encoderContext->pix_fmt;
     outputFrame->width = encoderContext->width;
     outputFrame->height = encoderContext->height;
 
-    // instead of directly sending the decoded frame to the encoder, we do a sws scale to convert the frame's pixel format and color range
-    // prepare a buffer for the output frame to hold the scaled image data
-    int outputFrameBufferSize = av_image_get_buffer_size(
-        encoderContext->pix_fmt, encoderContext->width, encoderContext->height,
-        1);
+    //TODO figure why av_frame_get_buffer causes gifs to not animate
+    //error = av_frame_get_buffer(outputFrame, 0);
+    error = av_image_alloc(outputFrame->data, outputFrame->linesize,
+        encoderContext->width, encoderContext->height, encoderContext->pix_fmt,
+        32);
 
-    if (outputFrameBufferSize < 0) {
-      error = outputFrameBufferSize;
+    if (error < 0) {
       return;
     }
 
-    outputFrameBuffer = reinterpret_cast<uint8_t *>(av_malloc(
-        outputFrameBufferSize));
+    //init frames and packets
 
-    if (!outputFrameBuffer) {
-      error = AVERROR_UNKNOWN;
+    AVStream* outputStream = avformat_new_stream(outputFormatContext, NULL);
+
+    error = avcodec_parameters_from_context(outputStream->codecpar,
+        decoderContext);
+
+    if (error) {
       return;
     }
 
-    int fillResult = av_image_fill_arrays(outputFrame->data,
-        outputFrame->linesize, outputFrameBuffer, encoderContext->pix_fmt,
-        encoderContext->width, encoderContext->height, 1)
-        == outputFrameBufferSize;
+    if (!(outputFormatContext->oformat->flags & AVFMT_NOFILE)) {
+      error = avio_open(&outputFormatContext->pb, output.c_str(),
+          AVIO_FLAG_WRITE);
+      if (error < 0) {
+        return;
+      }
+    }
 
-    if (!fillResult) {
-      error = AVERROR_UNKNOWN;
+    AVDictionary *opts = NULL;
+
+    if (gifThumb) {
+      av_dict_set(&opts, "loop", "0", 0);
+    }
+
+    error = avformat_write_header(outputFormatContext, &opts);
+
+    if (error) {
       return;
     }
 
-    //init frames
+    while (true) {
 
-    //transcode
+      av_frame_unref(inputFrame);
+      av_packet_unref(decodePacket);
 
-    double video_start_time =
-        static_cast<double>(inputFormatContext->start_time) / AV_TIME_BASE;
+      //probably ended frames
+      if (av_read_frame(inputFormatContext, decodePacket) < 0) {
+        error = 0;
+        break;
+      }
 
-    const double transcode_start_time = video_start_time;
+      //different stream. ignore.
+      if (decodePacket->stream_index != streamIndex) {
+        continue;
+      }
 
-    int64_t curr_timestamp_in_tb = static_cast<int64_t>(transcode_start_time
-        * stream->time_base.den / stream->time_base.num);
+      //send packet
+      error = avcodec_send_packet(decoderContext, decodePacket);
 
-    if (!read_frame_until_time(curr_timestamp_in_tb)) {
-      error = AVERROR_UNKNOWN;
+      if (error < 0) {
+
+        //get next one
+        if (error == AVERROR(EAGAIN)) {
+          continue;
+        } else {
+          return;
+        }
+      }
+
+      //send frame
+      error = avcodec_receive_frame(decoderContext, inputFrame);
+
+      if (error < 0) {
+
+        //get next one
+        if (error == AVERROR(EAGAIN)) {
+          continue;
+        } else {
+          return;
+        }
+      }
+
+      if (!sws_scale(swsCtx, inputFrame->data, inputFrame->linesize, 0,
+          inputFrame->height, outputFrame->data, outputFrame->linesize)) {
+        error = AVERROR_UNKNOWN;
+        return;
+      }
+
+      error = avcodec_send_frame(encoderContext, outputFrame);
+
+      if (error) {
+        return;
+      }
+
+      error = avcodec_receive_packet(encoderContext, encodePacket);
+
+      if (error) {
+        return;
+      }
+
+      encodePacket->pts = av_rescale_q_rnd(decodePacket->pts, stream->time_base,
+          outputStream->time_base,
+          static_cast<AVRounding>(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+      encodePacket->dts = av_rescale_q_rnd(decodePacket->dts, stream->time_base,
+          outputStream->time_base,
+          static_cast<AVRounding>(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+      encodePacket->duration = av_rescale_q(decodePacket->duration,
+          stream->time_base, outputStream->time_base);
+      encodePacket->pos = -1;
+
+      error = av_interleaved_write_frame(outputFormatContext, encodePacket);
+
+      if (error < 0) {
+        return;
+      } else if (!gifThumb) {
+        break;
+      }
+
+    }
+
+    error = av_write_trailer(outputFormatContext);
+
+    if (error) {
       return;
     }
 
-    transcodeFrame();
+    if (!(outputFormatContext->oformat->flags & AVFMT_NOFILE)) {
+      avio_closep(&outputFormatContext->pb);
+    }
 
   }
 
@@ -372,7 +380,7 @@ public:
 
 private:
   std::string path, output, errorStr;
-  int error;
+  int error = 0, streamIndex = 0;
   size_t width = 0, height = 0;
 
   AVFormatContext* inputFormatContext = NULL;
@@ -384,8 +392,6 @@ private:
   AVPacket* decodePacket = NULL;
   AVPacket* encodePacket = NULL;
 
-  uint8_t* outputFrameBuffer = NULL;
-
   SwsContext* swsCtx = nullptr;
 
   AVCodecContext* decoderContext = NULL;
@@ -396,6 +402,7 @@ private:
   AVCodecParameters* codecParameters = NULL;
 
   bool thumbNail = false;
+  bool gifThumb = false;
 };
 
 Napi::Value getVideoBounds(const Napi::CallbackInfo& args) {
@@ -420,8 +427,9 @@ Napi::Value thumbnailVideo(const Napi::CallbackInfo& args) {
   Napi::Function callback = args[4].As<Napi::Function>();
 
   VideoWorker* thumbWorker = new VideoWorker(callback,
-      args[0].As<Napi::String>(), args[1].As<Napi::String>(),
-      args[2].As<Napi::Number>(), args[3].As<Napi::Number>());
+      args[5].As<Napi::Boolean>(), args[0].As<Napi::String>(),
+      args[1].As<Napi::String>(), args[2].As<Napi::Number>(),
+      args[3].As<Napi::Number>());
   thumbWorker->Queue();
 
   return env.Undefined();

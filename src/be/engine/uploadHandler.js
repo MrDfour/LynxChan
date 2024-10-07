@@ -250,7 +250,7 @@ exports.generateVideoThumb = function(identifier, file, tooSmall, callback) {
     }
 
     return native.thumbNailVideo(file.pathInDisk, thumbDestination, widthToUse,
-        heightToUse, thumbCallback);
+        heightToUse, thumbCallback, false);
   }
 
   var command = videoThumbCommand.replace('{$path}', file.pathInDisk);
@@ -392,6 +392,24 @@ exports.generateImageThumb = function(identifier, file, callback) {
   } else {
 
     thumbDestination += '.gif';
+
+    if (native) {
+
+      var widthToUse, heightToUse;
+
+      if (file.width > file.height) {
+        widthToUse = thumbSize;
+        heightToUse = Math.floor(file.height * (thumbSize / file.width));
+      } else {
+        heightToUse = thumbSize;
+        widthToUse = Math.floor(file.width * (thumbSize / file.height));
+      }
+
+      return native.thumbNailVideo(file.pathInDisk, thumbDestination,
+          widthToUse, heightToUse, thumbCb, true);
+
+    }
+
     command = exports.getFfmpegGifCommand(file, thumbDestination);
   }
 
