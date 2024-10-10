@@ -171,9 +171,13 @@ public:
         outputFormatContext->video_codec->pix_fmts, decoderContext->pix_fmt,
         true, NULL);
 
-    encoderContext->time_base = av_make_q(1,
-        (stream->avg_frame_rate.num + (stream->avg_frame_rate.den / 2))
-            / stream->avg_frame_rate.den);
+    if (stream->avg_frame_rate.den) {
+      encoderContext->time_base = av_make_q(1,
+          (stream->avg_frame_rate.num + (stream->avg_frame_rate.den / 2))
+              / stream->avg_frame_rate.den);
+    } else {
+      encoderContext->time_base = av_make_q(1, 1);
+    }
 
     error = avcodec_open2(encoderContext, outputFormatContext->video_codec,
         nullptr);

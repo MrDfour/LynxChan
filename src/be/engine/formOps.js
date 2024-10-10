@@ -145,9 +145,11 @@ exports.getFileData = function(file, fields, mime, callback) {
 
   var measureFunction;
 
+  var isAudio = toPush.mime.indexOf('audio/') > -1;
+
   if (toPush.mime.indexOf('image/') > -1) {
     measureFunction = uploadHandler.getImageBounds;
-  } else if (toPush.mime.indexOf('video/') > -1 && mediaThumb) {
+  } else if ((isAudio || toPush.mime.indexOf('video/') > -1) && mediaThumb) {
     measureFunction = uploadHandler.getVideoBounds;
   }
 
@@ -158,7 +160,7 @@ exports.getFileData = function(file, fields, mime, callback) {
 
       exports.updateMetaMime(toPush, mime, fields);
 
-      if (error) {
+      if (error && !isAudio) {
         callback(error);
       } else {
         toPush.width = width;

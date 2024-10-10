@@ -19,8 +19,6 @@ var videoDimensionsCommand = 'ffprobe -v error -show_entries ';
 videoDimensionsCommand += 'stream=width,height:stream_tags=rotate ';
 var videoThumbCommand = 'ffmpeg -i {$path} -y -vframes 1 -vf scale=';
 var ffmpegGifCommand = 'ffmpeg -i {$path} -y -vf scale=';
-var mp3ThumbCommand = 'ffmpeg -i {$path} -y -an -vcodec copy {$destination}';
-mp3ThumbCommand += ' && mogrify -resize {$dimension} {$destination}';
 var thumbSize;
 var latestImages;
 var miscOps;
@@ -214,21 +212,37 @@ exports.transferThumbToGfs = function(identifier, file, callback) {
 
 };
 
-exports.generateVideoThumb = function(identifier, file, tooSmall, callback) {
+exports.generateVideoThumb = function(identifier, file, tooSmall, audio,
+    callback) {
 
   var extensionToUse = thumbExtension || 'png';
 
   var thumbDestination = file.pathInDisk + '_.' + extensionToUse;
 
-  file.thumbMime = logger.getMime(thumbDestination);
-  file.thumbOnDisk = thumbDestination;
-  file.thumbPath = '/.media/t_' + identifier;
-
   var thumbCallback = function(error) {
 
     if (error) {
-      callback(error);
+
+      if (audio) {
+
+        file.thumbPath = genericAudioThumb;
+
+        gsHandler.writeFile(file.pathInDisk, file.path, file.mime, {
+          sha256 : identifier,
+          type : 'media'
+        }, function(error) {
+          callback(error);
+        });
+      } else {
+        callback(error);
+      }
+
     } else {
+
+      file.thumbMime = logger.getMime(thumbDestination);
+      file.thumbOnDisk = thumbDestination;
+      file.thumbPath = '/.media/t_' + identifier;
+
       exports.transferThumbToGfs(identifier, file, callback);
     }
 
@@ -268,43 +282,6 @@ exports.generateVideoThumb = function(identifier, file, tooSmall, callback) {
   exec(command, {
     maxBuffer : Infinity
   }, thumbCallback);
-
-};
-
-exports.generateAudioThumb = function(identifier, file, callback) {
-
-  var extensionToUse = thumbExtension || 'png';
-
-  var thumbDestination = file.pathInDisk + '_.' + extensionToUse;
-
-  var mp3Command = mp3ThumbCommand.replace('{$path}', file.pathInDisk).replace(
-      /\{\$destination\}/g, thumbDestination).replace('{$dimension}',
-      thumbSize + 'x' + thumbSize);
-
-  exec(mp3Command, {
-    maxBuffer : Infinity
-  }, function createdThumb(error) {
-
-    if (error) {
-      file.thumbPath = genericAudioThumb;
-
-      gsHandler.writeFile(file.pathInDisk, file.path, file.mime, {
-        sha256 : identifier,
-        type : 'media'
-      }, function(error) {
-        callback(error);
-      });
-
-    } else {
-      file.thumbOnDisk = thumbDestination;
-      file.thumbMime = logger.getMime(thumbDestination);
-      file.thumbPath = '/.media/t_' + identifier;
-
-      exports.transferThumbToGfs(identifier, file, callback);
-
-    }
-
-  });
 
 };
 
@@ -459,14 +436,17 @@ exports.generateThumb = function(identifier, file, callback) {
   var imageCondition = file.mime.indexOf('image/') > -1;
   imageCondition = imageCondition && !tooSmall && file.mime !== 'image/svg+xml';
 
+  var mediaCondition = file.mime.indexOf('video/') > -1;
+  mediaCondition = mediaCondition || file.mime.indexOf('audio/') > -1
+      && file.height && file.width;
+
   if (file.mime === 'image/gif' && gifCondition) {
     exports.generateGifThumb(identifier, file, callback);
   } else if (imageCondition || fauxCondition) {
     exports.generateImageThumb(identifier, file, callback);
-  } else if (file.mime.indexOf('video/') > -1 && mediaThumb) {
-    exports.generateVideoThumb(identifier, file, tooSmall, callback);
-  } else if (file.mime.indexOf('audio/') > -1 && mediaThumb) {
-    exports.generateAudioThumb(identifier, file, callback);
+  } else if (mediaCondition && mediaThumb) {
+    exports.generateVideoThumb(identifier, file, tooSmall, mediaCondition
+        && file.mime.indexOf('audio/') > -1, callback);
   } else {
     exports.decideOnDefaultThumb(file, identifier, callback);
   }
