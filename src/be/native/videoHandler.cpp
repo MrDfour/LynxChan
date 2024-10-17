@@ -14,9 +14,9 @@ public:
   }
 
   VideoWorker(Napi::Function& callback, bool gif, std::string input,
-      std::string output, int width, int height) :
-      Napi::AsyncWorker(callback), path(input), output(output), width(width), height(
-          height), gifThumb(gif) {
+      std::string output, int width, int height, int percentage) :
+      Napi::AsyncWorker(callback), path(input), output(output), percentage(
+          percentage), width(width), height(height), gifThumb(gif) {
     thumbNail = true;
   }
 
@@ -28,27 +28,43 @@ public:
       return;
     }
 
-    av_packet_unref(decodePacket);
-    av_packet_unref(encodePacket);
+    if (decodePacket) {
+      av_packet_unref(decodePacket);
+      av_packet_free(&decodePacket);
+    }
+
+    if (encodePacket) {
+      av_packet_unref(encodePacket);
+      av_packet_free(&encodePacket);
+    }
 
     // flush the codec contexts with null packet
-    avcodec_send_frame(encoderContext, nullptr);
-    avcodec_send_packet(decoderContext, nullptr);
+    if (encoderContext) {
+      avcodec_send_frame(encoderContext, nullptr);
+      avcodec_free_context(&encoderContext);
+    }
 
-    av_freep(&outputFrame->data);
+    if (decoderContext) {
+      avcodec_send_packet(decoderContext, nullptr);
+      avcodec_free_context(&decoderContext);
+    }
 
-    av_frame_free(&outputFrame);
-    av_frame_free(&inputFrame);
+    if (outputFrame) {
+      av_freep(&outputFrame->data);
+      av_frame_free(&outputFrame);
+    }
 
-    sws_freeContext(swsCtx);
+    if (inputFrame) {
+      av_frame_free(&inputFrame);
+    }
 
-    av_packet_free(&encodePacket);
-    av_packet_free(&decodePacket);
+    if (swsCtx) {
+      sws_freeContext(swsCtx);
+    }
 
-    avcodec_free_context(&encoderContext);
-    avcodec_free_context(&decoderContext);
-
-    avformat_free_context(outputFormatContext);
+    if (outputFormatContext) {
+      avformat_free_context(outputFormatContext);
+    }
 
   }
 
@@ -175,6 +191,25 @@ public:
       encoderContext->time_base = av_make_q(1,
           (stream->avg_frame_rate.num + (stream->avg_frame_rate.den / 2))
               / stream->avg_frame_rate.den);
+
+      if (!gifThumb && percentage > 0 && percentage <= 100) {
+
+        int timeBaseRatio = stream->time_base.den / stream->time_base.num;
+
+        desiredTimeStamp = inputFormatContext->duration * timeBaseRatio
+            / AV_TIME_BASE / (100 / percentage);
+
+        error = av_seek_frame(inputFormatContext, streamIndex, desiredTimeStamp,
+            AVSEEK_FLAG_BACKWARD);
+
+        if (error < 0) {
+          return;
+        }
+
+        avcodec_flush_buffers(decoderContext);
+
+      }
+
     } else {
       encoderContext->time_base = av_make_q(1, 1);
     }
@@ -285,6 +320,11 @@ public:
         }
       }
 
+      if (desiredTimeStamp
+          && inputFrame->best_effort_timestamp < desiredTimeStamp) {
+        continue;
+      }
+
       if (!sws_scale(swsCtx, inputFrame->data, inputFrame->linesize, 0,
           inputFrame->height, outputFrame->data, outputFrame->linesize)) {
         error = AVERROR_UNKNOWN;
@@ -384,7 +424,7 @@ public:
 
 private:
   std::string path, output, errorStr;
-  int error = 0, streamIndex = 0;
+  int error = 0, streamIndex = 0, percentage = 0;
   size_t width = 0, height = 0;
 
   AVFormatContext* inputFormatContext = NULL;
@@ -407,6 +447,9 @@ private:
 
   bool thumbNail = false;
   bool gifThumb = false;
+
+  int64_t desiredTimeStamp = 0;
+
 };
 
 Napi::Value getVideoBounds(const Napi::CallbackInfo& args) {
@@ -433,7 +476,7 @@ Napi::Value thumbnailVideo(const Napi::CallbackInfo& args) {
   VideoWorker* thumbWorker = new VideoWorker(callback,
       args[5].As<Napi::Boolean>(), args[0].As<Napi::String>(),
       args[1].As<Napi::String>(), args[2].As<Napi::Number>(),
-      args[3].As<Napi::Number>());
+      args[3].As<Napi::Number>(), args[6].As<Napi::Number>());
   thumbWorker->Queue();
 
   return env.Undefined();

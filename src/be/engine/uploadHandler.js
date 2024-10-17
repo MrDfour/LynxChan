@@ -264,7 +264,7 @@ exports.generateVideoThumb = function(identifier, file, tooSmall, audio,
     }
 
     return native.thumbNailVideo(file.pathInDisk, thumbDestination, widthToUse,
-        heightToUse, thumbCallback, false);
+        heightToUse, thumbCallback, false, 0);
   }
 
   var command = videoThumbCommand.replace('{$path}', file.pathInDisk);
