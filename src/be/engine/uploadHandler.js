@@ -18,7 +18,8 @@ var files = db.files();
 var videoDimensionsCommand = 'ffprobe -v error -show_entries ';
 videoDimensionsCommand += 'stream=width,height:stream_tags=rotate ';
 var videoSkipCommand = '-ss $(echo "$(ffprobe -show_entries format=duration -of';
-videoSkipCommand += ' default=noprint_wrappers=1:nokey=1 {$path})/(100/{$percentage})" | bc) ';
+videoSkipCommand += ' default=noprint_wrappers=1:nokey=1 ';
+videoSkipCommand += '{$path})/(100/{$percentage})" | bc) ';
 var videoThumbCommand = 'ffmpeg -i {$path} -y {$skip}-vframes 1 -vf scale=';
 var ffmpegGifCommand = 'ffmpeg -i {$path} -y -vf scale=';
 var thumbSize;
@@ -283,8 +284,10 @@ exports.generateVideoThumb = function(identifier, file, tooSmall, audio,
 
   command += ' ' + thumbDestination;
 
-  //command = command.replace( '{$skip}', (videoPercentage > 0 && videoPercentage < 100) ? videoSkipCommand.replace('{$path}', file.pathInDisk).replace('{$percentage}', videoPercentage) : '');
-  
+  command = command.replace('{$skip}', (videoPercentage > 0
+      && videoPercentage < 100 && !audio) ? videoSkipCommand.replace('{$path}',
+      file.pathInDisk).replace('{$percentage}', videoPercentage) : '');
+
   exec(command, {
     maxBuffer : Infinity
   }, thumbCallback);
@@ -389,7 +392,7 @@ exports.generateImageThumb = function(identifier, file, callback) {
       }
 
       return native.thumbNailVideo(file.pathInDisk, thumbDestination,
-          widthToUse, heightToUse, thumbCb, true);
+          widthToUse, heightToUse, thumbCb, true, 0);
 
     }
 

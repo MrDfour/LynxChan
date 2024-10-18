@@ -16,7 +16,7 @@ If you wish to either make animated gif thumbnails with ffmpeg or make thumbnail
 8: Install zlib-devel and yasm from the package manager.
 9: Clone git://source.ffmpeg.org/ffmpeg.git and checkout the latest tag for the required version on the readme.
 10: Compile and install just like node. To be able to build native functions, you must run configure with both --enable-shared and --enable-pic. If you have a previous compilation, run make clean beforehand. Also, don't forget to run ldconfig to register the libraries, like "ldconfig /usr/local/lib". If you are having issues with pkg-config not finding it, use "export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"" and try again.
-11: Install ImageMagick-c++-devel from the package manager. This is also required to build the native functions.
+11: Install ImageMagick-c++-devel from the package manager. This is also required to build the native functions. Alternatively, install bc from the package manager if you do not wish to have native functions but wishes to skip to a percentage of videos when thumbnailing.
 
 If you wish to validate mimes:
 12: Install file from the package manager.

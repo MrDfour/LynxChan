@@ -23,6 +23,7 @@ See other branches named like `1.1.x` for stable versions. They will receive onl
 # Optional dependencies
 * [ffmpeg](https://www.ffmpeg.org/) 4.2 if mediaThumb setting is enabled. Requires zlib-devel on Rocky Linux to work properly when compiled from source. If you use the wrong version, native functions might not work.
 * [file](http://www.darwinsys.com/file/) 5.39 if the option to validate upload mimetypes is enabled.
+* [bc](https://linux.die.net/man/1/bc) 1.07.1 if you wish to thumbnail videos but do not have native functions working and wishes to skip to a percentage.
 * [exiftool](https://www.sno.phy.queensu.ca/~phil/exiftool/) 11.01 if the option to strip exif data is enabled.
 
 # Optional but recommended dependencies. Don't worry about exact versions unless they don't work.
