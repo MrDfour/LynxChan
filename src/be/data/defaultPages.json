@@ -500,6 +500,7 @@
       "fieldCaptchaPool": "value",
       "checkboxUnlockHistory": "checked",
       "fieldReportCategories": "value",
+      "fieldVideoThumbPercentage": "value",
       "fieldBypassTorDurationHours": "value",
       "fieldBypassTorMaxPosts": "value",
       "fieldBypassEarlyExpiration": "value",

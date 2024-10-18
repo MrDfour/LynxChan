@@ -17,7 +17,9 @@ var globalLatestImages = db.latestImages();
 var files = db.files();
 var videoDimensionsCommand = 'ffprobe -v error -show_entries ';
 videoDimensionsCommand += 'stream=width,height:stream_tags=rotate ';
-var videoThumbCommand = 'ffmpeg -i {$path} -y -vframes 1 -vf scale=';
+var videoSkipCommand = '-ss $(echo "$(ffprobe -show_entries format=duration -of';
+videoSkipCommand += ' default=noprint_wrappers=1:nokey=1 {$path})/(100/{$percentage})" | bc) ';
+var videoThumbCommand = 'ffmpeg -i {$path} -y {$skip}-vframes 1 -vf scale=';
 var ffmpegGifCommand = 'ffmpeg -i {$path} -y -vf scale=';
 var thumbSize;
 var latestImages;
@@ -27,6 +29,7 @@ var formOps;
 var thumbExtension;
 var mediaThumb;
 var ffmpegGif;
+var videoPercentage;
 var verbose;
 var onlySfwImages;
 var fauxAnimThreshold = 25 * 1024;
@@ -41,6 +44,7 @@ exports.loadSettings = function() {
 
   var settings = require('../settingsHandler').getGeneralSettings();
 
+  videoPercentage = settings.videoThumbPercentage || 0;
   ffmpegGif = settings.ffmpegGifs;
   onlySfwImages = settings.onlySfwLatestImages;
   thumbSize = settings.thumbSize;
@@ -264,7 +268,7 @@ exports.generateVideoThumb = function(identifier, file, tooSmall, audio,
     }
 
     return native.thumbNailVideo(file.pathInDisk, thumbDestination, widthToUse,
-        heightToUse, thumbCallback, false, 0);
+        heightToUse, thumbCallback, false, videoPercentage);
   }
 
   var command = videoThumbCommand.replace('{$path}', file.pathInDisk);
@@ -279,6 +283,8 @@ exports.generateVideoThumb = function(identifier, file, tooSmall, audio,
 
   command += ' ' + thumbDestination;
 
+  //command = command.replace( '{$skip}', (videoPercentage > 0 && videoPercentage < 100) ? videoSkipCommand.replace('{$path}', file.pathInDisk).replace('{$percentage}', videoPercentage) : '');
+  
   exec(command, {
     maxBuffer : Infinity
   }, thumbCallback);

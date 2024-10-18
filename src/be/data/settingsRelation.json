@@ -209,6 +209,11 @@
   },
   {
     "type": "number",
+    "setting": "videoThumbPercentage",
+    "element": "fieldVideoThumbPercentage"
+  },
+  {
+    "type": "number",
     "setting": "messageLength",
     "element": "fieldMessageLength"
   },

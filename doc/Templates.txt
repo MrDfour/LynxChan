@@ -2059,6 +2059,10 @@ TEM_ID::47
 globalSettingsPage: page used to change global settings.
 
 Elements:
+fieldVideoThumbPercentage:
+    use: have its value manipualted.
+    description: field with the value of where to skip videos to when thumbnailing.
+
 checkboxAutoMediaBan:
     use: might be checked.
     description: indicates if auto media ban is enabled.

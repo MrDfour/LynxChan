@@ -137,6 +137,7 @@ Settings files that goes into the settings directory:
 * `flagLimit`(Number): maximum amount of flags boards are allowed to have. Defaults to 50.
 * `torSource`: url to the list of TOR exit nodes ips. Defaults to `https://check.torproject.org/exit-addresses`.
 * `languagePackPath`: absolute path to an optional language pack.
+* `videoThumbPercentage`(Number): when making thumbnails for videos, skip to this percentage of the video. Ignored if below 1 or above 99.
 * `mediaThumb`(Boolean): if true, videos and music will generate thumbs instead of using the generic ones. Requires ffmpeg installed.
 * `maxBoardRules`(Number): maximum amount of rules that board owners can set. Defaults to 20.
 * `thumbSize`(Number): maximum size for both width and height for generated thumbnails. Defaults to 128.

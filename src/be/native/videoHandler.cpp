@@ -14,7 +14,7 @@ public:
   }
 
   VideoWorker(Napi::Function& callback, bool gif, std::string input,
-      std::string output, int width, int height, int percentage) :
+      std::string output, int width, int height, float percentage) :
       Napi::AsyncWorker(callback), path(input), output(output), percentage(
           percentage), width(width), height(height), gifThumb(gif) {
     thumbNail = true;
@@ -192,12 +192,11 @@ public:
           (stream->avg_frame_rate.num + (stream->avg_frame_rate.den / 2))
               / stream->avg_frame_rate.den);
 
-      if (!gifThumb && percentage > 0 && percentage <= 100) {
+      if (!gifThumb && percentage > 0 && percentage <= 99) {
 
-        int timeBaseRatio = stream->time_base.den / stream->time_base.num;
-
-        desiredTimeStamp = inputFormatContext->duration * timeBaseRatio
-            / AV_TIME_BASE / (100 / percentage);
+        desiredTimeStamp = inputFormatContext->duration
+            * (stream->time_base.den / stream->time_base.num) / AV_TIME_BASE
+            / (100 / percentage);
 
         error = av_seek_frame(inputFormatContext, streamIndex, desiredTimeStamp,
             AVSEEK_FLAG_BACKWARD);
@@ -424,7 +423,8 @@ public:
 
 private:
   std::string path, output, errorStr;
-  int error = 0, streamIndex = 0, percentage = 0;
+  int error = 0, streamIndex = 0;
+  float percentage = 0;
   size_t width = 0, height = 0;
 
   AVFormatContext* inputFormatContext = NULL;
