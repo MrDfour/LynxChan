@@ -186,6 +186,7 @@ exports.setGlobalRole = function(operatorData, parameters, language, callback,
     return;
   } else if (!override && operatorData.login === parameters.login) {
     callback(lang(language).errSelfRoleChange);
+    return;
   }
 
   users.findOne({
@@ -538,6 +539,10 @@ exports.validate = function(auth, language, callback) {
     } else {
 
       var user = result.value;
+      
+      if (isNaN(user.globalRole)) {
+        user.globalRole = 4;
+      }
 
       if (user.inactive && user.ownedBoards && user.ownedBoards.length) {
 
