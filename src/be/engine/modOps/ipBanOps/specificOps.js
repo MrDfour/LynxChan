@@ -614,6 +614,8 @@ exports.isolateBoards = function(userData, reportedObjects, parameters,
 exports.ban = function(userData, reportedObjects, parameters, captchaId,
     language, callback) {
 
+  userData = userData || {};
+
   if (noBanCaptcha || userData.globalRole <= miscOps.getMaxStaffRole()) {
     return exports.isolateBoards(userData, reportedObjects, parameters,
         language, callback);
