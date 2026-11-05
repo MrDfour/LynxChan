@@ -1,7 +1,11 @@
-#!/usr/bin/env node
+// Carga las variables de entorno de Render si existen
+var settingsHandler = require('./settingsHandler');
 
-/* You are not expected to understand this */
+// Si existe MONGODB_URI en Render, sobrescribe la configuración en memoria
+if (process.env.MONGODB_URI) {
+  var dbSettings = settingsHandler.getDbSettings();
+  dbSettings.address = process.env.MONGODB_URI;
+}
 
-'use strict';
-
-require('./kernel.js');
+// Inicia el boot normal de LynxChan
+require('./kernel');
