@@ -1,7 +1,7 @@
 {
   "port": 10000,
   "address": "0.0.0.0",
-  "fePath": "../../fe",
+  "fePath": "../fe",
   "verbose": true,
   "disableNativeCode": true,
   "useEmbeddedGraphics": true
