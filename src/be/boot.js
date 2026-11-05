@@ -1,40 +1,31 @@
 var fs = require('fs');
 var path = require('path');
 
-// 1. Inyectar MONGODB_URI en settings/db.json si existe en Render
+// 1. Asegurar archivos de configuración mínimos para pasar el check inicial
+var dbPath = path.join(__dirname, 'settings', 'db.json');
+if (!fs.existsSync(dbPath)) {
+  fs.writeFileSync(dbPath, JSON.stringify({ address: '127.0.0.1', port: 27017, db: 'Tec' }, null, 2));
+}
+
+var genPath = path.join(__dirname, 'settings', 'general.json');
+if (!fs.existsSync(genPath)) {
+  fs.writeFileSync(genPath, JSON.stringify({ port: 10000, address: '0.0.0.0', fePath: '../fe', verbose: true }, null, 2));
+}
+
+// 2. Parchear el handler de DB para que entregue la URI completa de Atlas si existe la variable
+var dbModule = require('./db');
+var originalInit = dbModule.init;
+
 if (process.env.MONGODB_URI) {
-  var dbPath = path.join(__dirname, 'settings', 'db.json');
-  var dbSettings = {};
-
-  try {
-    if (fs.existsSync(dbPath)) {
-      dbSettings = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-    }
-  } catch (e) {
-    dbSettings = { db: 'lynxchan' };
-  }
-
-  dbSettings.address = process.env.MONGODB_URI;
-  fs.writeFileSync(dbPath, JSON.stringify(dbSettings, null, 2));
+  var settingsHandler = require('./settingsHandler');
+  var origGetDbSettings = settingsHandler.getDbSettings;
+  
+  settingsHandler.getDbSettings = function() {
+    var settings = origGetDbSettings.apply(this, arguments) || {};
+    settings.url = process.env.MONGODB_URI;
+    return settings;
+  };
 }
 
-// 2. Inyectar REDIS_URI y PORT en settings/general.json si existen en Render
-if (process.env.REDIS_URI || process.env.PORT) {
-  var genPath = path.join(__dirname, 'settings', 'general.json');
-  var genSettings = {};
-
-  try {
-    if (fs.existsSync(genPath)) {
-      genSettings = JSON.parse(fs.readFileSync(genPath, 'utf8'));
-    }
-  } catch (e) {}
-
-  if (process.env.REDIS_URI) {
-    genSettings.redis = process.env.REDIS_URI;
-  }
-
-  fs.writeFileSync(genPath, JSON.stringify(genSettings, null, 2));
-}
-
-// 3. Iniciar el arranque normal de LynxChan sin dependencias circulares
+// 3. Arrancar LynxChan
 require('./kernel');
