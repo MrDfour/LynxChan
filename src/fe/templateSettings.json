@@ -1,5 +1,9 @@
 {
   "feName": "LynxChan Default Frontend",
   "defaultTheme": "default",
-  "thumbSize": 128
+  "thumbSize": 128,
+  "thumb": "thumb.pug",
+  "board": "board.pug",
+  "thread": "thread.pug",
+  "post": "post.pug"
 }
