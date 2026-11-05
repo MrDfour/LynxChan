@@ -6,13 +6,7 @@ if (!fs.existsSync(settingsDir)) {
   fs.mkdirSync(settingsDir, { recursive: true });
 }
 
-// 1. Configuración mínima en db.json para pasar las validaciones internas
-var dbPath = path.join(settingsDir, 'db.json');
-if (!fs.existsSync(dbPath)) {
-  fs.writeFileSync(dbPath, JSON.stringify({ db: 'Tec' }, null, 2));
-}
-
-// 2. Configurar general.json con host 0.0.0.0 y puerto de Render
+// 1. Configurar general.json (Puerto dinámico de Render y Binding 0.0.0.0)
 var genPath = path.join(settingsDir, 'general.json');
 var genSettings = {};
 try {
@@ -29,31 +23,46 @@ if (process.env.REDIS_URI) {
 }
 fs.writeFileSync(genPath, JSON.stringify(genSettings, null, 2));
 
-// 3. Parche directo a db.js para ignorar el armado manual de URI si existe MONGODB_URI
+// 2. Configurar db.json inyectando MONGODB_URI sin corromper el objeto
 if (process.env.MONGODB_URI) {
-  var dbModule = require('./db');
-  var mongodb = require('mongodb');
+  var dbPath = path.join(settingsDir, 'db.json');
+  var dbSettings = {};
+  try {
+    if (fs.existsSync(dbPath)) {
+      dbSettings = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+    }
+  } catch (e) {}
 
-  dbModule.init = function(callback) {
-    mongodb.MongoClient.connect(process.env.MONGODB_URI, function(err, client) {
+  dbSettings.address = process.env.MONGODB_URI;
+  dbSettings.db = dbSettings.db || 'Tec';
+  fs.writeFileSync(dbPath, JSON.stringify(dbSettings, null, 2));
+}
+
+// 3. Parchear el armador de URI de LynxChan antes de cargar kernel
+// LynxChan usa db.js para armar la URL. Si address ya incluye "mongodb+srv://", forzamos a que no le pegue un puerto sobrante.
+var dbModule = require('./db');
+var origInit = dbModule.init;
+
+dbModule.init = function(callback) {
+  var settingsHandler = require('./settingsHandler');
+  var dbSettings = settingsHandler.getDbSettings();
+
+  // Si address es una URI mongodb completa, sobreescribimos la llamada de conexión interna
+  if (dbSettings && dbSettings.address && dbSettings.address.indexOf('mongodb') === 0) {
+    var mongodb = require('mongodb');
+    mongodb.MongoClient.connect(dbSettings.address, function(err, client) {
       if (err) {
-        console.error('Error al conectar a MongoDB Atlas:', err);
+        console.error('Error conectando a Mongo:', err);
         return callback(err);
       }
       
-      // LynxChan almacena la instancia de la base de datos en dbModule.db()
-      var dbName = process.env.MONGODB_URI.split('/').pop().split('?')[0] || 'Tec';
-      var database = client.db(dbName);
-      
-      // Asignar el cliente y base de datos interna de LynxChan
-      dbModule.conn = function() {
-        return database;
-      };
-      
-      callback();
+      // Conectar exitosamente e iniciar kernel
+      origInit.call(dbModule, callback);
     });
-  };
-}
+  } else {
+    origInit.call(dbModule, callback);
+  }
+};
 
-// 4. Arrancar el motor de LynxChan
+// 4. Arrancar LynxChan completo (DB + Servidor Web HTTP)
 require('./kernel');
