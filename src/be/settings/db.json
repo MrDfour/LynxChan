@@ -1,0 +1,4 @@
+{
+  "address": "env:MONGODB_URI",
+  "db": "lynxchan"
+}
