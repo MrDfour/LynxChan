@@ -6,7 +6,9 @@
   "audioThumb": "audioThumb.jpg",
   "spoiler": "spoiler.jpg",
   "maintenance": "maintenance.jpg",
+  "defaultBanner": "defaultBanner.jpg",
   "board": "board.pug",
   "thread": "thread.pug",
-  "post": "post.pug"
+  "post": "post.pug",
+  "notFound": "404.pug"
 }
