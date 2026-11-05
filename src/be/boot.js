@@ -6,7 +6,7 @@ if (!fs.existsSync(settingsDir)) {
   fs.mkdirSync(settingsDir, { recursive: true });
 }
 
-// Configuración de base de datos
+// 1. Inyectar MONGODB_URI en db.json
 if (process.env.MONGODB_URI) {
   var dbPath = path.join(settingsDir, 'db.json');
   var dbSettings = {};
@@ -17,61 +17,30 @@ if (process.env.MONGODB_URI) {
     }
   } catch (e) {}
 
-  // Parsear la cadena mongodb+srv para inyectar los campos nativos de LynxChan
-  var uri = process.env.MONGODB_URI;
-  
-  // Si es un enlace mongodb+srv o mongodb completo
-  if (uri.startsWith('mongodb')) {
-    dbSettings.address = uri;
-    // Forzamos a que LynxChan pase la URI directa al MongoClient
-    dbSettings.connectUrl = uri;
-  }
-
+  dbSettings.address = process.env.MONGODB_URI;
   fs.writeFileSync(dbPath, JSON.stringify(dbSettings, null, 2));
 }
 
-// Configuración general
-if (process.env.REDIS_URI || process.env.PORT) {
-  var genPath = path.join(settingsDir, 'general.json');
-  var genSettings = {};
+// 2. Inyectar Bind Address (0.0.0.0) y Puerto en general.json
+var genPath = path.join(settingsDir, 'general.json');
+var genSettings = {};
 
-  try {
-    if (fs.existsSync(genPath)) {
-      genSettings = JSON.parse(fs.readFileSync(genPath, 'utf8'));
-    }
-  } catch (e) {}
-
-  if (process.env.REDIS_URI) {
-    genSettings.redis = process.env.REDIS_URI;
+try {
+  if (fs.existsSync(genPath)) {
+    genSettings = JSON.parse(fs.readFileSync(genPath, 'utf8'));
   }
-  if (process.env.PORT) {
-    genSettings.port = parseInt(process.env.PORT, 10);
-  }
-  genSettings.fePath = genSettings.fePath || '../fe';
+} catch (e) {}
 
-  fs.writeFileSync(genPath, JSON.stringify(genSettings, null, 2));
+if (process.env.REDIS_URI) {
+  genSettings.redis = process.env.REDIS_URI;
 }
 
-// Reemplazar el método de inicialización de DB en tiempo de ejecución para evitar el ensamblado manual de URLs
-var dbModule = require('./db');
-var origInit = dbModule.init;
+// Forzar binding publico y asignar el puerto dinamico de Render
+genSettings.address = '0.0.0.0';
+genSettings.port = process.env.PORT ? parseInt(process.env.PORT, 10) : 10000;
+genSettings.fePath = genSettings.fePath || '../fe';
 
-dbModule.init = function(callback) {
-  if (process.env.MONGODB_URI) {
-    var mongoClient = require('mongodb').MongoClient;
-    mongoClient.connect(process.env.MONGODB_URI, function(err, client) {
-      if (err) {
-        console.error('Error al conectar a MongoDB Atlas:', err);
-        if (callback) callback(err);
-        return;
-      }
-      // Si la conexión directa a Atlas es exitosa, dejamos que continúe el init normal
-      origInit.call(dbModule, callback);
-    });
-  } else {
-    origInit.call(dbModule, callback);
-  }
-};
+fs.writeFileSync(genPath, JSON.stringify(genSettings, null, 2));
 
-// Iniciar el kernel de LynxChan
+// 3. Iniciar LynxChan
 require('./kernel');
