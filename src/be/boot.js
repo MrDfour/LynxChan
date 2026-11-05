@@ -1,31 +1,47 @@
 var fs = require('fs');
 var path = require('path');
 
-// 1. Asegurar archivos de configuración mínimos para pasar el check inicial
-var dbPath = path.join(__dirname, 'settings', 'db.json');
-if (!fs.existsSync(dbPath)) {
-  fs.writeFileSync(dbPath, JSON.stringify({ address: '127.0.0.1', port: 27017, db: 'Tec' }, null, 2));
+var settingsDir = path.join(__dirname, 'settings');
+if (!fs.existsSync(settingsDir)) {
+  fs.mkdirSync(settingsDir, { recursive: true });
 }
 
-var genPath = path.join(__dirname, 'settings', 'general.json');
-if (!fs.existsSync(genPath)) {
-  fs.writeFileSync(genPath, JSON.stringify({ port: 10000, address: '0.0.0.0', fePath: '../fe', verbose: true }, null, 2));
-}
-
-// 2. Parchear el handler de DB para que entregue la URI completa de Atlas si existe la variable
-var dbModule = require('./db');
-var originalInit = dbModule.init;
-
+// Inyectar MONGODB_URI desde Render si existe
 if (process.env.MONGODB_URI) {
-  var settingsHandler = require('./settingsHandler');
-  var origGetDbSettings = settingsHandler.getDbSettings;
-  
-  settingsHandler.getDbSettings = function() {
-    var settings = origGetDbSettings.apply(this, arguments) || {};
-    settings.url = process.env.MONGODB_URI;
-    return settings;
-  };
+  var dbPath = path.join(settingsDir, 'db.json');
+  var dbSettings = {};
+
+  try {
+    if (fs.existsSync(dbPath)) {
+      dbSettings = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+    }
+  } catch (e) {}
+
+  dbSettings.address = process.env.MONGODB_URI;
+  fs.writeFileSync(dbPath, JSON.stringify(dbSettings, null, 2));
 }
 
-// 3. Arrancar LynxChan
+// Inyectar REDIS_URI y PORT desde Render si existen
+if (process.env.REDIS_URI || process.env.PORT) {
+  var genPath = path.join(settingsDir, 'general.json');
+  var genSettings = {};
+
+  try {
+    if (fs.existsSync(genPath)) {
+      genSettings = JSON.parse(fs.readFileSync(genPath, 'utf8'));
+    }
+  } catch (e) {}
+
+  if (process.env.REDIS_URI) {
+    genSettings.redis = process.env.REDIS_URI;
+  }
+  if (process.env.PORT) {
+    genSettings.port = parseInt(process.env.PORT, 10);
+  }
+  genSettings.fePath = genSettings.fePath || '../fe';
+
+  fs.writeFileSync(genPath, JSON.stringify(genSettings, null, 2));
+}
+
+// Iniciar LynxChan de forma estándar
 require('./kernel');
