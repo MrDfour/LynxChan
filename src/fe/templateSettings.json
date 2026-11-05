@@ -2,7 +2,10 @@
   "feName": "LynxChan Default Frontend",
   "defaultTheme": "default",
   "thumbSize": 128,
-  "thumb": "thumb.pug",
+  "thumb": "thumb.jpg",
+  "audioThumb": "audioThumb.jpg",
+  "spoiler": "spoiler.jpg",
+  "maintenance": "maintenance.jpg",
   "board": "board.pug",
   "thread": "thread.pug",
   "post": "post.pug"
