@@ -1,0 +1,6 @@
+{
+  "port": 10000,
+  "address": "0.0.0.0",
+  "fePath": "../../fe",
+  "verbose": true
+}
